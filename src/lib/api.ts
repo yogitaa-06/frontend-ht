@@ -5,6 +5,7 @@ import type {
   Health,
   IpRulePage,
   AuditPage,
+  JobPage,
   Resume,
   ResumePage,
 } from "../types";
@@ -50,6 +51,8 @@ export const endpoints = {
   me: () => api<CurrentProfile>("/auth/me"),
   health: () => api<Health>("/health"),
   readiness: () => api<Health>("/health/ready"),
+  jobs: (page = 1, pageSize = 20) =>
+    api<JobPage>(`/jobs?page=${page}&page_size=${pageSize}`),
   resumes: () => api<ResumePage>("/resumes"),
   upload: (file: File) => {
     const form = new FormData();

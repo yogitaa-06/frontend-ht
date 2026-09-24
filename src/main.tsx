@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { endpoints } from "./lib/api";
 import { supabase } from "./lib/supabase";
+import { FreshJobs } from "./pages/FreshJobs";
 import type {
   CandidateProfile,
   CurrentProfile,
@@ -34,7 +35,13 @@ import type {
 import "./styles.css";
 
 type Page =
-  "overview" | "resumes" | "profile" | "security" | "system" | "unavailable";
+  | "overview"
+  | "resumes"
+  | "profile"
+  | "fresh-jobs"
+  | "security"
+  | "system"
+  | "unavailable";
 const pageFromHash = (): Page => {
   const value = location.hash.replace("#/", "");
   const routes: Record<string, Page> = {
@@ -48,8 +55,8 @@ const pageFromHash = (): Page => {
     system: "system",
     "system-health": "system",
     unavailable: "unavailable",
+    "fresh-jobs": "fresh-jobs",
     "recommended-jobs": "unavailable",
-    "search-jobs": "unavailable",
     tracking: "unavailable",
   };
   return routes[value] ?? "overview";
@@ -224,12 +231,12 @@ function Shell({
   const [mobile, setMobile] = useState(false);
   const nav = [
     { label: "Overview", icon: LayoutDashboard },
+    { label: "Fresh jobs", icon: BriefcaseBusiness },
     { label: "Resumes", icon: FileText },
     { label: "Candidate profile", icon: UserRound },
   ];
   const future = [
-    { label: "Recommended jobs", icon: BriefcaseBusiness },
-    { label: "Search jobs", icon: Search },
+    { label: "Recommended jobs", icon: Search },
     { label: "Tracking", icon: Activity },
   ];
   return (
@@ -312,6 +319,8 @@ function Shell({
             <Resumes />
           ) : page === "profile" ? (
             <Profile />
+          ) : page === "fresh-jobs" ? (
+            <FreshJobs />
           ) : page === "security" ? (
             <Security />
           ) : page === "system" ? (
@@ -332,6 +341,7 @@ function pageTitle(page: Page) {
       overview: "Overview",
       resumes: "Resumes",
       profile: "Candidate profile",
+      "fresh-jobs": "Fresh jobs",
       security: "IP security",
       system: "System health",
       unavailable: "Product areas",
@@ -358,7 +368,9 @@ function NavItem({
     >
       <Icon size={17} />
       <span>{label}</span>
-      {!active && label.includes("jobs") && <span className="soon">Soon</span>}
+      {!active && label === "Recommended jobs" && (
+        <span className="soon">Soon</span>
+      )}
     </a>
   );
 }
@@ -454,8 +466,10 @@ function Overview({ profile }: { profile: CurrentProfile | null }) {
         />
         <RoadmapCard
           icon={BriefcaseBusiness}
-          title="Jobs & tracking"
-          text="Global jobs, matching, recommendations, and tracking are not in the backend yet."
+          title="Fresh jobs"
+          text="Browse fresh jobs collected continuously into the global canonical job database."
+          href="#/fresh-jobs"
+          available
         />
       </div>
     </>

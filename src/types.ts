@@ -95,3 +95,37 @@ export interface Health {
   service: string;
   version: string;
 }
+
+export interface Job {
+  id: string;
+  source: string;
+  external_job_id: string;
+  job_title: string;
+  role_family: string;
+  company: string | null;
+  location: string | null;
+  job_url: string | null;
+  description: string | null;
+  salary_text: string | null;
+  employment_type: string | null;
+  remote: boolean | null;
+  skills: string[];
+  posted_at: string | null;
+  experience_min_years: number | null;
+  experience_max_years: number | null;
+  experience_text: string | null;
+  match_score: number | null;
+  role_score: number | null;
+  skills_score: number | null;
+  experience_score: number | null;
+  location_score: number | null;
+  freshness_score: number | null;
+}
+
+export interface JobPage {
+  items: Job[];
+  page: number;
+  page_size: number;
+  total: number;
+  pages: number;
+}
