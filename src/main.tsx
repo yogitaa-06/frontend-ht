@@ -43,7 +43,7 @@ type Page =
   | "system"
   | "unavailable";
 const pageFromHash = (): Page => {
-  const value = location.hash.replace("#/", "");
+  const value = location.hash.replace("#/", "").split("?")[0];
   const routes: Record<string, Page> = {
     "": "overview",
     overview: "overview",

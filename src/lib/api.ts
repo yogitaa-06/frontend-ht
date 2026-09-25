@@ -51,8 +51,30 @@ export const endpoints = {
   me: () => api<CurrentProfile>("/auth/me"),
   health: () => api<Health>("/health"),
   readiness: () => api<Health>("/health/ready"),
-  jobs: (page = 1, pageSize = 20) =>
-    api<JobPage>(`/jobs?page=${page}&page_size=${pageSize}`),
+  jobs: (
+    page = 1,
+    pageSize = 20,
+    filters?: {
+      query?: string;
+      role?: string;
+      location?: string;
+      remote?: boolean;
+      employment_type?: string;
+      source?: string;
+    },
+  ) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (filters?.query) params.set("query", filters.query);
+    if (filters?.role) params.set("role", filters.role);
+    if (filters?.location) params.set("location", filters.location);
+    if (filters?.remote) params.set("remote", "true");
+    if (filters?.employment_type) params.set("employment_type", filters.employment_type);
+    if (filters?.source) params.set("source", filters.source);
+    return api<JobPage>(`/jobs?${params.toString()}`);
+  },
   resumes: () => api<ResumePage>("/resumes"),
   upload: (file: File) => {
     const form = new FormData();

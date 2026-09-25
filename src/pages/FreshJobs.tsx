@@ -8,6 +8,7 @@ import {
 import { JobCard } from "../components/jobs/JobCard";
 import { JobCardSkeleton } from "../components/jobs/JobCardSkeleton";
 import { JobPagination } from "../components/jobs/JobPagination";
+import { JobFilters } from "../components/jobs/JobFilters";
 import { endpoints } from "../lib/api";
 import type { Job } from "../types";
 
@@ -34,8 +35,64 @@ function PageHeader({ eyebrow, title, description, action }: PageHeaderProps) {
 }
 
 export function FreshJobs() {
+  const getParams = () => {
+    const hash = window.location.hash;
+    const qIndex = hash.indexOf("?");
+    return new URLSearchParams(qIndex !== -1 ? hash.slice(qIndex) : "");
+  };
+
+  const [urlParams, setUrlParams] = useState(getParams);
+
+  useEffect(() => {
+    const onHash = () => setUrlParams(getParams());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const page = Number(urlParams.get("page") || "1");
+  const query = urlParams.get("query") || "";
+  const role = urlParams.get("role") || "";
+  const location = urlParams.get("location") || "";
+  const remote = urlParams.get("remote") === "true";
+  const employmentType = urlParams.get("employment_type") || "";
+  const source = urlParams.get("source") || "";
+  
+  const hasFilters = Boolean(query || role || location || remote || employmentType || source);
+
+  const updateParams = (updates: Record<string, string | boolean | null>) => {
+    const next = getParams();
+    let changed = false;
+    
+    // Changing filters resets page to 1
+    let resetPage = false;
+
+    for (const [k, v] of Object.entries(updates)) {
+      if (k !== "page") resetPage = true;
+      if (v === null || v === false || v === "") {
+        if (next.has(k)) { next.delete(k); changed = true; }
+      } else {
+        if (next.get(k) !== String(v)) { next.set(k, String(v)); changed = true; }
+      }
+    }
+    
+    if (resetPage && next.has("page") && !updates.page) {
+      next.delete("page");
+      changed = true;
+    }
+
+    if (changed) {
+      const hash = window.location.hash.split("?")[0];
+      const qs = next.toString();
+      window.location.hash = qs ? `${hash}?${qs}` : hash;
+    }
+  };
+
+  const clearFilters = () => {
+    const hash = window.location.hash.split("?")[0];
+    window.location.hash = hash;
+  };
+
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -49,7 +106,14 @@ export function FreshJobs() {
     setError(false);
 
     endpoints
-      .jobs(page, pageSize)
+      .jobs(page, pageSize, {
+        query: query || undefined,
+        role: role || undefined,
+        location: location || undefined,
+        remote: remote || undefined,
+        employment_type: employmentType || undefined,
+        source: source || undefined,
+      })
       .then((response) => {
         if (cancelled) return;
         setJobs(response.items);
@@ -66,10 +130,10 @@ export function FreshJobs() {
     return () => {
       cancelled = true;
     };
-  }, [page, refreshKey]);
+  }, [page, query, role, location, remote, employmentType, source, refreshKey]);
 
   const changePage = (nextPage: number) => {
-    setPage(nextPage);
+    updateParams({ page: String(nextPage) });
     requestAnimationFrame(() => {
       jobsSectionRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -114,6 +178,25 @@ export function FreshJobs() {
           </span>
         </div>
       </div>
+
+      <JobFilters
+        query={query}
+        role={role}
+        location={location}
+        remote={remote}
+        employmentType={employmentType}
+        source={source}
+        onChange={(updates) => updateParams({
+          query: updates.query ?? query,
+          role: updates.role ?? role,
+          location: updates.location ?? location,
+          remote: updates.remote ?? remote,
+          employment_type: updates.employmentType ?? employmentType,
+          source: updates.source ?? source,
+        })}
+        onClear={clearFilters}
+        hasFilters={hasFilters}
+      />
 
       <div className="jobs-section" ref={jobsSectionRef} aria-busy={loading}>
         {!loading && !error && total > 0 && (
@@ -169,11 +252,15 @@ export function FreshJobs() {
             <div className="empty-icon">
               <BriefcaseBusiness size={21} aria-hidden="true" />
             </div>
-            <h2>No fresh jobs are available yet.</h2>
+            <h2>{hasFilters ? "No jobs match your current filters." : "No fresh jobs are available yet."}</h2>
             <p>
-              Jobs will appear here as HireAndTech background collectors ingest
-              them.
+              {hasFilters ? "Try adjusting your search criteria." : "Jobs will appear here as HireAndTech background collectors ingest them."}
             </p>
+            {hasFilters && (
+              <button className="secondary" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <>
