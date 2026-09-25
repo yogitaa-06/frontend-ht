@@ -329,25 +329,27 @@ function Shell({
           </div>
         </header>
         <main className="content">
-          {page === "resumes" ? (
-            <Resumes />
-          ) : page === "profile" ? (
-            <Profile />
-          ) : page === "fresh-jobs" ? (
-            <FreshJobs />
-          ) : page === "job-search" ? (
-            <JobSearch />
-          ) : page === "security" ? (
-            <Security />
-          ) : page === "system" ? (
-            <System />
-          ) : page === "tracking" ? (
-            <StatsTracking />
-          ) : page === "unavailable" ? (
-            <Unavailable />
-          ) : (
-            <Overview profile={profile} />
-          )}
+          <div className="content-inner">
+            {page === "resumes" ? (
+              <Resumes />
+            ) : page === "profile" ? (
+              <Profile />
+            ) : page === "fresh-jobs" ? (
+              <FreshJobs />
+            ) : page === "job-search" ? (
+              <JobSearch />
+            ) : page === "security" ? (
+              <Security />
+            ) : page === "system" ? (
+              <System />
+            ) : page === "tracking" ? (
+              <StatsTracking />
+            ) : page === "unavailable" ? (
+              <Unavailable />
+            ) : (
+              <Overview profile={profile} />
+            )}
+          </div>
         </main>
       </div>
     </div>
