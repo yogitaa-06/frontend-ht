@@ -7,6 +7,7 @@ import {
   ChevronRight,
   FileText,
   Fingerprint,
+  GripVertical,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -14,9 +15,12 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Send,
   ShieldCheck,
   Sun,
+  Target,
   Trash2,
+  Trophy,
   UploadCloud,
   UserRound,
   X,
@@ -41,6 +45,7 @@ type Page =
   | "fresh-jobs"
   | "security"
   | "system"
+  | "tracking"
   | "unavailable";
 const pageFromHash = (): Page => {
   const value = location.hash.replace("#/", "").split("?")[0];
@@ -57,7 +62,8 @@ const pageFromHash = (): Page => {
     unavailable: "unavailable",
     "fresh-jobs": "fresh-jobs",
     "recommended-jobs": "unavailable",
-    tracking: "unavailable",
+    tracking: "tracking",
+    "stats-tracking": "tracking",
   };
   return routes[value] ?? "overview";
 };
@@ -234,10 +240,10 @@ function Shell({
     { label: "Fresh jobs", icon: BriefcaseBusiness },
     { label: "Resumes", icon: FileText },
     { label: "Candidate profile", icon: UserRound },
+    { label: "Tracking", icon: Activity },
   ];
   const future = [
     { label: "Recommended jobs", icon: Search },
-    { label: "Tracking", icon: Activity },
   ];
   return (
     <div className="app-shell">
@@ -325,6 +331,8 @@ function Shell({
             <Security />
           ) : page === "system" ? (
             <System />
+          ) : page === "tracking" ? (
+            <StatsTracking />
           ) : page === "unavailable" ? (
             <Unavailable />
           ) : (
@@ -344,6 +352,7 @@ function pageTitle(page: Page) {
       "fresh-jobs": "Fresh jobs",
       security: "IP security",
       system: "System health",
+      tracking: "Stats & Tracking",
       unavailable: "Product areas",
     } as Record<Page, string>
   )[page];
@@ -1076,6 +1085,232 @@ function HealthCard({
     </div>
   );
 }
+/* ── Stats & Tracking types ── */
+type TrackingStage = "applied" | "interviewing" | "offer" | "rejected";
+interface TrackedJob {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  stage: TrackingStage;
+  score: number;
+  appliedAt: string;
+}
+
+const STAGE_LABELS: Record<TrackingStage, string> = {
+  applied: "Applied",
+  interviewing: "Interviewing",
+  offer: "Offer",
+  rejected: "Rejected",
+};
+
+const STAGE_ORDER: TrackingStage[] = ["applied", "interviewing", "offer", "rejected"];
+
+function StatsTracking() {
+  const [resumeFilter, setResumeFilter] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [jobs, setJobs] = useState<TrackedJob[]>([]);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<TrackingStage | null>(null);
+
+  const doRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 900);
+  };
+
+  const moveJob = (id: string, stage: TrackingStage) => {
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, stage } : j)));
+  };
+
+  /* Derived stats */
+  const total = jobs.length;
+  const applied = jobs.filter((j) => j.stage === "applied").length;
+  const interviewing = jobs.filter((j) => j.stage === "interviewing").length;
+  const offers = jobs.filter((j) => j.stage === "offer").length;
+  const avgScore =
+    total > 0
+      ? Math.round(jobs.reduce((s, j) => s + j.score, 0) / total)
+      : 0;
+
+  const statCards = [
+    { label: "Total Jobs", value: total, icon: <BriefcaseBusiness size={20} /> },
+    { label: "Applied", value: applied, icon: <Send size={20} /> },
+    { label: "Interviewing", value: interviewing, icon: <UserRound size={20} /> },
+    { label: "Offers", value: offers, icon: <Trophy size={20} /> },
+    { label: "Avg Score", value: avgScore, icon: <Target size={20} /> },
+  ];
+
+  return (
+    <>
+      <div className="tracking-topbar">
+        <PageHeader
+          eyebrow="Pipeline"
+          title="Stats & Tracking"
+          description="Track your job application pipeline – drag cards to move between stages"
+          action={
+            <button
+              className="secondary"
+              onClick={doRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw size={15} className={refreshing ? "spin" : ""} />
+              Refresh
+            </button>
+          }
+        />
+      </div>
+
+      {/* Filter row */}
+      <div className="tracking-filter-row">
+        <label className="tracking-filter-label">
+          Filter by Resume:
+          <select
+            className="tracking-select"
+            value={resumeFilter}
+            onChange={(e) => setResumeFilter(e.target.value)}
+          >
+            <option value="">All Resumes</option>
+            <option value="r1">Software Engineer Resume</option>
+            <option value="r2">Full Stack Developer Resume</option>
+            <option value="r3">Data Scientist Resume</option>
+          </select>
+        </label>
+        <span className="tracking-drag-hint">
+          <GripVertical size={13} /> Drag cards to move between stages
+        </span>
+      </div>
+
+      {/* Stat cards */}
+      <div className="tracking-stat-grid">
+        {statCards.map((s) => (
+          <div key={s.label} className="tracking-stat-card">
+            <div className="tracking-stat-icon hero-icon">{s.icon}</div>
+            <div className="tracking-stat-val">{s.value}</div>
+            <div className="card-label">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pipeline board */}
+      <div className="panel tracking-pipeline-panel">
+        <div className="panel-title">
+          <div>
+            <span className="eyebrow">Kanban view</span>
+            <h2>Job Application Pipeline</h2>
+          </div>
+          <Activity size={21} />
+        </div>
+
+        {total === 0 ? (
+          /* ── Empty state ── */
+          <div className="empty">
+            <div className="empty-icon hero-icon">
+              <BriefcaseBusiness size={22} />
+            </div>
+            <h2>No jobs found</h2>
+            <p>Start a job search to see your pipeline here.</p>
+            <a className="primary" href="#/fresh-jobs">
+              Start Job Search <ArrowRight size={15} />
+            </a>
+          </div>
+        ) : (
+          /* ── Board columns ── */
+          <div className="tracking-board">
+            {STAGE_ORDER.map((stage) => (
+              <div
+                key={stage}
+                className={`tracking-col${
+                  dragOver === stage ? " tracking-col--over" : ""
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(stage);
+                }}
+                onDragLeave={() => setDragOver(null)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragging) moveJob(dragging, stage);
+                  setDragging(null);
+                  setDragOver(null);
+                }}
+              >
+                <div className="tracking-col-header">
+                  <span className="eyebrow">{STAGE_LABELS[stage]}</span>
+                  <span className="badge">
+                    {jobs.filter((j) => j.stage === stage).length}
+                  </span>
+                </div>
+                <div className="tracking-col-cards">
+                  {jobs
+                    .filter((j) => j.stage === stage)
+                    .map((job) => (
+                      <div
+                        key={job.id}
+                        className="tracking-job-card"
+                        draggable
+                        onDragStart={() => setDragging(job.id)}
+                        onDragEnd={() => setDragging(null)}
+                      >
+                        <div className="tracking-job-title">{job.title}</div>
+                        <div className="tracking-job-company">{job.company}</div>
+                        <div className="tracking-job-meta">
+                          <span>{job.location}</span>
+                          <span className="badge success">Score: {job.score}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Demo add button */}
+        {total === 0 && (
+          <div style={{ textAlign: "center", marginTop: 8 }}>
+            <button
+              className="secondary compact"
+              onClick={() =>
+                setJobs([
+                  {
+                    id: "demo-1",
+                    title: "Frontend Engineer",
+                    company: "Acme Corp",
+                    location: "Remote",
+                    stage: "applied",
+                    score: 87,
+                    appliedAt: new Date().toISOString(),
+                  },
+                  {
+                    id: "demo-2",
+                    title: "Full Stack Developer",
+                    company: "StartupXY",
+                    location: "New York, NY",
+                    stage: "interviewing",
+                    score: 74,
+                    appliedAt: new Date().toISOString(),
+                  },
+                  {
+                    id: "demo-3",
+                    title: "Backend Engineer",
+                    company: "BigTech Inc",
+                    location: "San Francisco, CA",
+                    stage: "offer",
+                    score: 92,
+                    appliedAt: new Date().toISOString(),
+                  },
+                ])
+              }
+            >
+              Load demo data
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function Unavailable() {
   return (
     <>
