@@ -56,6 +56,7 @@ export function FreshJobs() {
   const remote = urlParams.get("remote") === "true";
   const employmentType = urlParams.get("employment_type") || "";
   const source = urlParams.get("source") || "";
+  const matchResume = urlParams.get("match_resume") === "true";
   
   const hasFilters = Boolean(query || role || location || remote || employmentType || source);
 
@@ -105,15 +106,18 @@ export function FreshJobs() {
     setLoading(true);
     setError(false);
 
-    endpoints
-      .jobs(page, pageSize, {
-        query: query || undefined,
-        role: role || undefined,
-        location: location || undefined,
-        remote: remote || undefined,
-        employment_type: employmentType || undefined,
-        source: source || undefined,
-      })
+    const fetchJobs = matchResume
+      ? endpoints.recommendedJobs(page, pageSize)
+      : endpoints.jobs(page, pageSize, {
+          query: query || undefined,
+          role: role || undefined,
+          location: location || undefined,
+          remote: remote || undefined,
+          employment_type: employmentType || undefined,
+          source: source || undefined,
+        });
+
+    fetchJobs
       .then((response) => {
         if (cancelled) return;
         setJobs(response.items);
@@ -130,7 +134,7 @@ export function FreshJobs() {
     return () => {
       cancelled = true;
     };
-  }, [page, query, role, location, remote, employmentType, source, refreshKey]);
+  }, [page, query, role, location, remote, employmentType, source, matchResume, refreshKey]);
 
   const changePage = (nextPage: number) => {
     updateParams({ page: String(nextPage) });
@@ -152,19 +156,29 @@ export function FreshJobs() {
         title="Fresh jobs"
         description="Recently published jobs collected by HireAndTech background workers."
         action={
-          <button
-            className="secondary"
-            type="button"
-            onClick={() => setRefreshKey((current) => current + 1)}
-            disabled={loading}
-          >
-            <RefreshCw
-              className={loading ? "spin" : undefined}
-              size={16}
-              aria-hidden="true"
-            />
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <label className="tracking-filter-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, fontWeight: 500 }}>
+              <input
+                type="checkbox"
+                checked={matchResume}
+                onChange={(e) => updateParams({ match_resume: e.target.checked, page: "1" })}
+              />
+              Match with My Resume
+            </label>
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setRefreshKey((current) => current + 1)}
+              disabled={loading}
+            >
+              <RefreshCw
+                className={loading ? "spin" : undefined}
+                size={16}
+                aria-hidden="true"
+              />
+              {loading ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
         }
       />
 

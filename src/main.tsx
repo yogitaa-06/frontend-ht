@@ -1409,6 +1409,9 @@ function JobSearch() {
     else if (jobType.contract) typeStr = "contract";
     if (typeStr) params.set("employment_type", typeStr);
 
+    // Explicitly enforce resume matching when navigating from the search page
+    params.set("match_resume", "true");
+
     // Navigate to fresh-jobs with filters
     window.location.hash = `#/fresh-jobs?${params.toString()}`;
   };
@@ -1653,7 +1656,7 @@ function StatsTracking() {
         const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
         
         const newJobs = page.items
-          .filter(j => j.posted_at && new Date(j.posted_at).getTime() > twoHoursAgo)
+          .filter(j => j.scraped_at && new Date(j.scraped_at).getTime() > twoHoursAgo)
           .map(j => ({
             id: j.id,
             title: j.job_title?.trim() || "Untitled position",

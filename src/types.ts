@@ -111,6 +111,7 @@ export interface Job {
   remote: boolean | null;
   skills: string[];
   posted_at: string | null;
+  scraped_at: string | null;
   experience_min_years: number | null;
   experience_max_years: number | null;
   experience_text: string | null;

@@ -75,6 +75,13 @@ export const endpoints = {
     if (filters?.source) params.set("source", filters.source);
     return api<JobPage>(`/jobs?${params.toString()}`);
   },
+  recommendedJobs: (page = 1, pageSize = 20) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    return api<JobPage>(`/jobs/recommended?${params.toString()}`);
+  },
   resumes: () => api<ResumePage>("/resumes"),
   upload: (file: File) => {
     const form = new FormData();
