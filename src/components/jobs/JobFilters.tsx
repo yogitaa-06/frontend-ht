@@ -117,6 +117,7 @@ export function JobFilters({
           <option value="dice">Dice</option>
           <option value="linkedin">LinkedIn</option>
           <option value="glassdoor">Glassdoor</option>
+          <option value="hiringcafe">HiringCafe</option>
         </select>
 
         <label className="checkbox-label">

@@ -25,9 +25,12 @@ export function formatEmploymentType(value: string | null | undefined): string {
 export function formatSource(value: string | null | undefined): string {
   if (!value?.trim()) return "Job source";
   const normalized = value.trim().toLowerCase();
-  return normalized === "dice"
-    ? "Dice"
-    : normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  if (normalized === "dice") return "Dice";
+  if (normalized === "linkedin") return "LinkedIn";
+  if (normalized === "hiringcafe") return "HiringCafe";
+  if (normalized === "glassdoor") return "Glassdoor";
+  
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 export function formatJobAge(
