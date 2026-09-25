@@ -1571,7 +1571,19 @@ function JobSearch() {
 }
 
 /* ── Stats & Tracking types ── */
-type TrackingStage = "applied" | "interviewing" | "offer" | "rejected";
+type TrackingStage = 
+  | "new"
+  | "interested"
+  | "applied"
+  | "screening"
+  | "interview1"
+  | "interview2"
+  | "interview3"
+  | "offer"
+  | "hired"
+  | "rejected"
+  | "archived";
+
 interface TrackedJob {
   id: string;
   title: string;
@@ -1583,13 +1595,32 @@ interface TrackedJob {
 }
 
 const STAGE_LABELS: Record<TrackingStage, string> = {
+  new: "New",
+  interested: "Interested",
   applied: "Applied",
-  interviewing: "Interviewing",
+  screening: "Screening",
+  interview1: "Interview 1",
+  interview2: "Interview 2",
+  interview3: "Interview 3",
   offer: "Offer",
+  hired: "Hired",
   rejected: "Rejected",
+  archived: "Archived",
 };
 
-const STAGE_ORDER: TrackingStage[] = ["applied", "interviewing", "offer", "rejected"];
+const STAGE_ORDER: TrackingStage[] = [
+  "new",
+  "interested",
+  "applied",
+  "screening",
+  "interview1",
+  "interview2",
+  "interview3",
+  "offer",
+  "hired",
+  "rejected",
+  "archived",
+];
 
 function StatsTracking() {
   const [resumeFilter, setResumeFilter] = useState("");
@@ -1610,7 +1641,9 @@ function StatsTracking() {
   /* Derived stats */
   const total = jobs.length;
   const applied = jobs.filter((j) => j.stage === "applied").length;
-  const interviewing = jobs.filter((j) => j.stage === "interviewing").length;
+  const interviewing = jobs.filter((j) => 
+    ["screening", "interview1", "interview2", "interview3"].includes(j.stage)
+  ).length;
   const offers = jobs.filter((j) => j.stage === "offer").length;
   const avgScore =
     total > 0
@@ -1771,7 +1804,7 @@ function StatsTracking() {
                     title: "Full Stack Developer",
                     company: "StartupXY",
                     location: "New York, NY",
-                    stage: "interviewing",
+                    stage: "interview1",
                     score: 74,
                     appliedAt: new Date().toISOString(),
                   },

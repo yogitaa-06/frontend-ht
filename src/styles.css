@@ -2005,3 +2005,80 @@ html[data-theme="dark"] .search-tag-chip {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Kanban Board ── */
+.tracking-pipeline-panel {
+  display: flex;
+  flex-direction: column;
+}
+.tracking-board {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  min-height: 400px;
+}
+.tracking-col {
+  min-width: 280px;
+  width: 280px;
+  background: #f0f4fb;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border: 2px dashed transparent;
+  transition: border-color 0.2s;
+}
+.tracking-col--over {
+  border-color: var(--accent);
+  background: #e6eefc;
+}
+.tracking-col-header {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e1e7f0;
+}
+.tracking-col-cards {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  overflow-y: auto;
+}
+.tracking-job-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  cursor: grab;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.tracking-job-card:active {
+  cursor: grabbing;
+}
+.tracking-job-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.04);
+}
+.tracking-job-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.tracking-job-company {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.tracking-job-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
