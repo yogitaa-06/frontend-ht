@@ -1801,3 +1801,192 @@ html[data-theme="dark"] .resume-active-banner { background: var(--accent-soft); 
 html[data-theme="dark"] .resume-active-banner b { color: #c5d9ff; }
 html[data-theme="dark"] .badge-active { background: #1a3157; color: #a9c4f7; border-color: #284774; }
 html[data-theme="dark"] .resume-card-active { box-shadow: 0 0 0 3px #1a3157, 0 4px 16px #0006; }
+
+/* ─── Job Search Page ─────────── */
+
+.search-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.search-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.search-panel-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.search-panel-content {
+  padding: 24px;
+}
+.search-criteria-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+.search-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.search-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.search-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.search-active-resume-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.search-file-upload-mock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.search-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  outline: none;
+  font-family: inherit;
+}
+.search-select:focus {
+  border-color: var(--accent);
+}
+.search-radio-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.search-check-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.search-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.search-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+  margin-bottom: 40px;
+}
+.search-error-text {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Tag Input */
+.search-tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.search-tag-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.search-tag-input-row {
+  display: flex;
+  gap: 8px;
+}
+.search-tag-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  outline: none;
+}
+.search-tag-input:focus {
+  border-color: var(--accent);
+}
+.search-tag-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+.search-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.search-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--accent-soft);
+  border: 1px solid #c2d6f7;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+}
+.search-tag-chip button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--accent);
+  opacity: 0.7;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-tag-chip button:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+
+html[data-theme="dark"] .search-tag-chip {
+  border-color: #2a4a80;
+}
+
+@media (max-width: 768px) {
+  .search-criteria-grid {
+    grid-template-columns: 1fr;
+  }
+}

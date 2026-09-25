@@ -12,6 +12,7 @@ import {
   GripVertical,
   LayoutDashboard,
   LogOut,
+  MapPin,
   Menu,
   Moon,
   Plus,
@@ -19,6 +20,8 @@ import {
   Search,
   Send,
   ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
   Sun,
   Target,
   Trash2,
@@ -45,6 +48,7 @@ type Page =
   | "resumes"
   | "profile"
   | "fresh-jobs"
+  | "job-search"
   | "security"
   | "system"
   | "tracking"
@@ -66,6 +70,7 @@ const pageFromHash = (): Page => {
     "recommended-jobs": "unavailable",
     tracking: "tracking",
     "stats-tracking": "tracking",
+    "job-search": "job-search",
   };
   return routes[value] ?? "overview";
 };
@@ -240,6 +245,7 @@ function Shell({
   const nav = [
     { label: "Overview", icon: LayoutDashboard },
     { label: "Fresh jobs", icon: BriefcaseBusiness },
+    { label: "Job search", icon: Search },
     { label: "Resumes", icon: FileText },
     { label: "Candidate profile", icon: UserRound },
     { label: "Tracking", icon: Activity },
@@ -329,6 +335,8 @@ function Shell({
             <Profile />
           ) : page === "fresh-jobs" ? (
             <FreshJobs />
+          ) : page === "job-search" ? (
+            <JobSearch />
           ) : page === "security" ? (
             <Security />
           ) : page === "system" ? (
@@ -352,6 +360,7 @@ function pageTitle(page: Page) {
       resumes: "Resumes",
       profile: "Candidate profile",
       "fresh-jobs": "Fresh jobs",
+      "job-search": "Job search",
       security: "IP security",
       system: "System health",
       tracking: "Stats & Tracking",
@@ -1249,6 +1258,316 @@ function HealthCard({
     </div>
   );
 }
+/* ── Job Search ── */
+
+function TagInput({
+  label,
+  placeholder,
+  hint,
+  tags,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  hint: string;
+  tags: string[];
+  onChange: (t: string[]) => void;
+}) {
+  const [val, setVal] = useState("");
+  const add = () => {
+    const trimmed = val.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed]);
+    }
+    setVal("");
+  };
+  return (
+    <div className="search-tag-group">
+      <div className="search-tag-label">{label}</div>
+      <div className="search-tag-input-row">
+        <input
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+          className="search-tag-input"
+        />
+        <button type="button" className="secondary compact" onClick={add}>
+          <Plus size={16} />
+        </button>
+      </div>
+      <div className="search-tag-hint">{hint}</div>
+      {tags.length > 0 && (
+        <div className="search-tag-list">
+          {tags.map((t) => (
+            <span key={t} className="search-tag-chip">
+              {t}
+              <button
+                type="button"
+                onClick={() => onChange(tags.filter((x) => x !== t))}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobSearch() {
+  const [activeResumeId] = useState<string | null>(
+    () => localStorage.getItem(ACTIVE_RESUME_KEY)
+  );
+  const [profile, setProfile] = useState<CandidateProfile | null>(null);
+  const [resumeName, setResumeName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Form state
+  const [domains, setDomains] = useState<string[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
+  const [postedDate, setPostedDate] = useState("Any time");
+  const [experience, setExperience] = useState("");
+  const [remotePref, setRemotePref] = useState({
+    onsite: false,
+    remote: false,
+    hybrid: false,
+  });
+  const [jobType, setJobType] = useState({
+    fulltime: false,
+    parttime: false,
+    contract: false,
+    internship: false,
+    temporary: false,
+  });
+
+  // Load active profile and infer defaults
+  useEffect(() => {
+    if (!activeResumeId) return;
+    setLoading(true);
+    
+    Promise.all([
+      endpoints.profile(activeResumeId).catch((e) => {
+        console.error("Failed to load profile", e);
+        return null;
+      }),
+      endpoints.resumes().then(res => res.items.find(r => r.id === activeResumeId)).catch(() => null)
+    ])
+      .then(([p, r]) => {
+        if (r) setResumeName(r.original_filename);
+        if (p) {
+          setProfile(p);
+          // Infer domains
+          const inferredDomains = [];
+          if (p.current_title) inferredDomains.push(p.current_title);
+          if (p.skills && p.skills.length > 0) {
+             // just take a couple top skills as examples if no title
+             if (inferredDomains.length === 0) {
+               inferredDomains.push(...p.skills.slice(0, 2));
+             }
+          }
+          setDomains(inferredDomains);
+  
+          // Infer locations
+          if (p.location) setLocations([p.location]);
+  
+          // Infer experience
+          if (p.years_of_experience !== null && p.years_of_experience !== undefined) {
+             const yoe = Number(p.years_of_experience);
+             if (!isNaN(yoe)) {
+               if (yoe < 2) setExperience("Entry Level");
+               else if (yoe < 6) setExperience("Mid Level");
+               else if (yoe < 10) setExperience("Senior Level");
+               else setExperience("Executive");
+             }
+          }
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [activeResumeId]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Construct query parameters
+    const params = new URLSearchParams();
+    if (domains.length > 0) params.set("query", domains.join(" "));
+    if (locations.length > 0) params.set("location", locations.join(","));
+    if (remotePref.remote) params.set("remote", "true");
+    
+    let typeStr = "";
+    if (jobType.fulltime) typeStr = "fulltime";
+    else if (jobType.parttime) typeStr = "parttime";
+    else if (jobType.contract) typeStr = "contract";
+    if (typeStr) params.set("employment_type", typeStr);
+
+    // Navigate to fresh-jobs with filters
+    window.location.hash = `#/fresh-jobs?${params.toString()}`;
+  };
+
+  const remotePrefError = !remotePref.onsite && !remotePref.remote && !remotePref.hybrid;
+  const jobTypeError = !jobType.fulltime && !jobType.parttime && !jobType.contract && !jobType.internship && !jobType.temporary;
+
+  return (
+    <>
+      <PageHeader
+        title="Job Search"
+        description="Configure and start your job search"
+      />
+
+      <div className="search-panel">
+        <div className="search-panel-header">
+          <FileText size={18} />
+          <h3>Resume Selection</h3>
+        </div>
+        <div className="search-panel-content">
+          <div className="search-field-group">
+            <label className="search-label">Select from Saved Resumes</label>
+            {loading ? (
+              <div className="skeleton-line" style={{ height: 42, borderRadius: 8 }} />
+            ) : resumeName ? (
+              <div className="search-active-resume-box">
+                <FileText size={16} className="muted" />
+                <span>{resumeName}</span>
+                <span className="badge success" style={{ marginLeft: "auto" }}>Selected</span>
+              </div>
+            ) : (
+              <div className="search-active-resume-box" style={{ background: "var(--bg)", borderColor: "var(--line)" }}>
+                <span className="muted">No active resume selected</span>
+                <a href="#/resumes" className="secondary compact" style={{ marginLeft: "auto" }}>Go select one</a>
+              </div>
+            )}
+          </div>
+          <div className="search-field-group" style={{ marginTop: 20 }}>
+            <label className="search-label">Or Upload New Resume</label>
+            <div className="search-file-upload-mock">
+               <span className="muted">Choose File</span> No file chosen
+            </div>
+            <div className="search-tag-hint">Supported format: PDF only (Max 5MB)</div>
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={handleSearch}>
+        <div className="search-panel">
+          <div className="search-panel-header">
+            <SlidersHorizontal size={18} />
+            <h3>Search Criteria</h3>
+          </div>
+          <div className="search-panel-content search-criteria-grid">
+            {/* Left Column */}
+            <div className="search-col">
+              <TagInput
+                label="Job Domains * (Multiple)"
+                placeholder="e.g., DevOps Engineer, SRE, Cloud Engineer"
+                hint="Add multiple job titles/domains. Press Enter or click + to add each one."
+                tags={domains}
+                onChange={setDomains}
+              />
+              <TagInput
+                label="Locations * (Multiple)"
+                placeholder="e.g., New York, Texas, Remote, California"
+                hint="Add multiple locations. Searches will run sequentially (2-sec gap). Press Enter or click + to add each one."
+                tags={locations}
+                onChange={setLocations}
+              />
+              <div className="search-field-group">
+                <label className="search-label">Posted Date</label>
+                <select
+                  className="search-select"
+                  value={postedDate}
+                  onChange={(e) => setPostedDate(e.target.value)}
+                >
+                  <option>Any time</option>
+                  <option>Past 24 hours</option>
+                  <option>Past week</option>
+                  <option>Past month</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="search-col">
+              <div className="search-field-group">
+                <label className="search-label">Experience Level</label>
+                <div className="search-radio-grid">
+                  <label className="search-radio-label">
+                    <input type="radio" name="exp" checked={experience === "Entry Level"} onChange={() => setExperience("Entry Level")} /> Entry Level
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="radio" name="exp" checked={experience === "Mid Level"} onChange={() => setExperience("Mid Level")} /> Mid Level
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="radio" name="exp" checked={experience === "Senior Level"} onChange={() => setExperience("Senior Level")} /> Senior Level
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="radio" name="exp" checked={experience === "Executive"} onChange={() => setExperience("Executive")} /> Executive
+                  </label>
+                </div>
+              </div>
+
+              <div className="search-field-group">
+                <label className="search-label">Remote Preference *</label>
+                <div className="search-check-grid">
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={remotePref.onsite} onChange={(e) => setRemotePref({...remotePref, onsite: e.target.checked})} /> On-site
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={remotePref.remote} onChange={(e) => setRemotePref({...remotePref, remote: e.target.checked})} /> Remote
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={remotePref.hybrid} onChange={(e) => setRemotePref({...remotePref, hybrid: e.target.checked})} /> Hybrid
+                  </label>
+                </div>
+                {remotePrefError && <div className="search-error-text">Please select at least one remote preference</div>}
+              </div>
+
+              <div className="search-field-group">
+                <label className="search-label">Job Type *</label>
+                <div className="search-check-grid">
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={jobType.fulltime} onChange={(e) => setJobType({...jobType, fulltime: e.target.checked})} /> Full-time
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={jobType.parttime} onChange={(e) => setJobType({...jobType, parttime: e.target.checked})} /> Part-time
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={jobType.contract} onChange={(e) => setJobType({...jobType, contract: e.target.checked})} /> Contract
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={jobType.internship} onChange={(e) => setJobType({...jobType, internship: e.target.checked})} /> Internship
+                  </label>
+                  <label className="search-radio-label">
+                    <input type="checkbox" checked={jobType.temporary} onChange={(e) => setJobType({...jobType, temporary: e.target.checked})} /> Temporary
+                  </label>
+                </div>
+                {jobTypeError && <div className="search-error-text">Please select at least one job type</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="search-actions">
+          <button
+            type="submit"
+            className="primary"
+            disabled={remotePrefError || jobTypeError || domains.length === 0 || locations.length === 0}
+            style={{ padding: "12px 24px", fontSize: 14 }}
+          >
+            <Search size={18} style={{ marginRight: 8 }} /> Start Job Search
+          </button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 /* ── Stats & Tracking types ── */
 type TrackingStage = "applied" | "interviewing" | "offer" | "rejected";
 interface TrackedJob {
