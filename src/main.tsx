@@ -1,9 +1,11 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
   ArrowRight,
   BriefcaseBusiness,
+  Check,
+  CheckCircle2,
   ChevronRight,
   FileText,
   Fingerprint,
@@ -518,87 +520,219 @@ function RoadmapCard({
   );
 }
 
+/* ── upload queue item ── */
+type QueueStatus = "pending" | "uploading" | "done" | "error";
+interface QueueItem { id: string; file: File; status: QueueStatus; error?: string; }
+
+const ACTIVE_RESUME_KEY = "hnt-active-resume";
+
 function Resumes() {
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selected, setSelected] = useState<CandidateProfile | null>(null);
+  const [selectedResumeId, setSelectedResumeId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(
+    () => localStorage.getItem(ACTIVE_RESUME_KEY),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const load = () => {
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
+
+  const load = useCallback(() => {
     setLoading(true);
     endpoints
       .resumes()
-      .then((r) => {
-        setResumes(r.items);
-        setError("");
-      })
+      .then((r) => { setResumes(r.items); setError(""); })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(load, [load]);
+
+  /* Persist active resume to localStorage */
+  const markActive = (id: string) => {
+    setActiveId(id);
+    localStorage.setItem(ACTIVE_RESUME_KEY, id);
   };
-  useEffect(load, []);
-  const upload = async (file: File) => {
-    if (file.type !== "application/pdf") {
-      setError("Only PDF files are accepted by the backend.");
-      return;
+
+  /* Sequential queue processor */
+  const processQueue = useCallback(async (items: QueueItem[]) => {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    for (const item of items) {
+      if (item.status !== "pending") continue;
+      setQueue((prev) =>
+        prev.map((q) => q.id === item.id ? { ...q, status: "uploading" } : q),
+      );
+      try {
+        await endpoints.upload(item.file);
+        setQueue((prev) =>
+          prev.map((q) => q.id === item.id ? { ...q, status: "done" } : q),
+        );
+      } catch (e) {
+        setQueue((prev) =>
+          prev.map((q) =>
+            q.id === item.id
+              ? { ...q, status: "error", error: e instanceof Error ? e.message : "Upload failed" }
+              : q,
+          ),
+        );
+      }
     }
-    setUploading(true);
-    setError("");
-    try {
-      await endpoints.upload(file);
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
+    processingRef.current = false;
+    load();
+  }, [load]);
+
+  const enqueue = useCallback((files: FileList | File[]) => {
+    const arr = Array.from(files);
+    const pdfs = arr.filter((f) => f.type === "application/pdf" || f.name.endsWith(".pdf"));
+    const nonPdfs = arr.length - pdfs.length;
+    if (nonPdfs > 0) setError(`${nonPdfs} non-PDF file(s) skipped. Only PDF files are accepted.`);
+    if (pdfs.length === 0) return;
+    const newItems: QueueItem[] = pdfs.map((f) => ({
+      id: `${f.name}-${f.size}-${Date.now()}`,
+      file: f,
+      status: "pending",
+    }));
+    setQueue((prev) => {
+      const combined = [...prev, ...newItems];
+      processQueue(combined);
+      return combined;
+    });
+  }, [processQueue]);
+
+  const clearDoneQueue = () =>
+    setQueue((prev) => prev.filter((q) => q.status !== "done"));
+
   const remove = async (id: string) => {
     if (!confirm("Delete this resume?")) return;
     try {
       await endpoints.deleteResume(id);
-      setSelected(null);
+      if (activeId === id) {
+        setActiveId(null);
+        localStorage.removeItem(ACTIVE_RESUME_KEY);
+      }
+      if (selectedResumeId === id) setSelected(null);
       load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Delete failed");
     }
   };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length) enqueue(e.dataTransfer.files);
+  };
+
+  const activeResume = resumes.find((r) => r.id === activeId);
+  const uploadingCount = queue.filter((q) => q.status === "uploading" || q.status === "pending").length;
+  const doneCount = queue.filter((q) => q.status === "done").length;
+
   return (
     <>
       <PageHeader
         eyebrow="Private documents"
         title="Resumes"
-        description="Manage the resumes used to create your structured candidate profile."
+        description="Upload multiple PDF resumes and select one as your active profile for job matching."
         action={
           <label className="primary upload-button">
-            <UploadCloud size={17} />{" "}
-            {uploading ? "Uploading…" : "Upload resume"}
+            <UploadCloud size={17} />
+            {uploadingCount > 0 ? `Uploading ${uploadingCount}…` : "Upload resumes"}
             <input
+              ref={fileInputRef}
               type="file"
               accept="application/pdf,.pdf"
-              disabled={uploading}
-              onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
+              multiple
+              disabled={uploadingCount > 0}
+              onChange={(e) => e.target.files && enqueue(e.target.files)}
             />
           </label>
         }
       />
+
       {error && (
         <div className="alert error">
           {error}
-          <button onClick={() => setError("")}>
-            <X size={15} />
+          <button onClick={() => setError("")}><X size={15} /></button>
+        </div>
+      )}
+
+      {/* Active resume banner */}
+      {activeResume && (
+        <div className="info-banner resume-active-banner">
+          <CheckCircle2 size={19} />
+          <div>
+            <b>Active resume: {activeResume.original_filename}</b>
+            <span>This resume is used for job matching and recommendations.</span>
+          </div>
+          <button
+            className="secondary compact"
+            style={{ marginLeft: "auto", flexShrink: 0 }}
+            onClick={() => setSelected(null)}
+          >
+            Change
           </button>
         </div>
       )}
-      <div className="info-banner">
+
+      {/* Drag-and-drop zone */}
+      <div
+        className={`resume-drop-zone${dragOver ? " resume-drop-zone--over" : ""}`}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+        aria-label="Drop PDF resumes here or click to browse"
+      >
+        <UploadCloud size={28} />
+        <span>
+          <b>Drop PDF files here</b> or <span className="text-link">click to browse</span>
+        </span>
+        <span className="muted" style={{ fontSize: 11 }}>Supports multiple files at once</span>
+      </div>
+
+      {/* Upload queue */}
+      {queue.length > 0 && (
+        <div className="resume-queue">
+          <div className="resume-queue-header">
+            <span className="eyebrow">Upload queue</span>
+            {doneCount > 0 && (
+              <button className="secondary compact" onClick={clearDoneQueue}>
+                Clear done ({doneCount})
+              </button>
+            )}
+          </div>
+          {queue.map((item) => (
+            <div key={item.id} className={`resume-queue-item rq-${item.status}`}>
+              <FileText size={14} />
+              <span className="resume-queue-name">{item.file.name}</span>
+              <span className="resume-queue-size">{fmtBytes(item.file.size)}</span>
+              <span className="resume-queue-status">
+                {item.status === "pending" && "Waiting…"}
+                {item.status === "uploading" && <><RefreshCw size={12} className="spin" /> Uploading</>}
+                {item.status === "done" && <><Check size={12} /> Done</>}
+                {item.status === "error" && <span title={item.error}>Failed</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Library section */}
+      <div className="info-banner" style={{ marginTop: 8 }}>
         <ShieldCheck size={19} />
         <div>
           <b>Private by design</b>
-          <span>
-            Files are owner-scoped and stored privately. Parsing happens in the
-            backend; the browser never extracts resume text.
-          </span>
+          <span>Files are owner-scoped and stored privately. Parsing happens in the backend.</span>
         </div>
       </div>
+
       <div className="section-heading">
         <div>
           <span className="eyebrow">Your library</span>
@@ -608,85 +742,115 @@ function Resumes() {
               : `${resumes.length} resume${resumes.length === 1 ? "" : "s"}`}
           </h2>
         </div>
+        {resumes.length > 0 && (
+          <span className="muted" style={{ fontSize: 12 }}>
+            Click <b>Set active</b> on a resume to use it for job matching
+          </span>
+        )}
       </div>
+
       {loading ? (
-        <div className="skeleton-list">
-          <div />
-          <div />
-        </div>
+        <div className="skeleton-list"><div /><div /></div>
       ) : resumes.length === 0 ? (
         <Empty
           title="No resume uploaded yet"
-          text="Upload a PDF to create your persistent candidate profile."
+          text="Upload one or more PDFs above to create your persistent candidate profile."
         />
       ) : (
-        <div className="resume-layout">
-          <div className="resume-list">
-            {resumes.map((r) => (
-              <ResumeCard
-                key={r.id}
-                resume={r}
-                selected={selected?.resume_id === r.id}
-                onProfile={() =>
-                  endpoints
-                    .profile(r.id)
-                    .then(setSelected)
-                    .catch((e) => setError(e.message))
+        <div className="resume-library">
+          {resumes.map((r) => (
+            <ResumeCard
+              key={r.id}
+              resume={r}
+              isActive={r.id === activeId}
+              isProfileOpen={selectedResumeId === r.id}
+              onSetActive={() => markActive(r.id)}
+              onProfile={() => {
+                if (selectedResumeId === r.id) {
+                  setSelected(null);
+                  setSelectedResumeId(null);
+                  return;
                 }
-                onDelete={() => remove(r.id)}
-              />
-            ))}
-          </div>
-          {selected && <CandidateCard profile={selected} />}
+                setSelectedResumeId(r.id);
+                endpoints
+                  .profile(r.id)
+                  .then(setSelected)
+                  .catch((e) => setError(e.message));
+              }}
+              onDelete={() => remove(r.id)}
+            />
+          ))}
+          {selectedResumeId && selected && (
+            <CandidateCard profile={selected} />
+          )}
         </div>
       )}
     </>
   );
 }
+
 function ResumeCard({
   resume,
-  selected,
+  isActive,
+  isProfileOpen,
+  onSetActive,
   onProfile,
   onDelete,
 }: {
   resume: Resume;
-  selected: boolean;
+  isActive: boolean;
+  isProfileOpen: boolean;
+  onSetActive: () => void;
   onProfile: () => void;
   onDelete: () => void;
 }) {
   return (
-    <div className={selected ? "resume-card selected" : "resume-card"}>
+    <div className={`resume-card resume-card-v2${isActive ? " resume-card-active" : ""}${isProfileOpen ? " resume-card-open" : ""}`}>
+      {/* Active indicator strip */}
+      {isActive && <div className="resume-active-strip" />}
+
       <div className="file-icon">
         <FileText size={20} />
       </div>
+
       <div className="resume-main">
         <div className="resume-title">
           <b>{resume.original_filename}</b>
           <span
-            className={`badge ${resume.status === "parsed" ? "success" : resume.status === "parse_failed" ? "danger" : ""}`}
+            className={`badge ${
+              resume.status === "parsed" ? "success" :
+              resume.status === "parse_failed" ? "danger" : ""
+            }`}
           >
             {resume.status.replace("_", " ")}
           </span>
+          {isActive && (
+            <span className="badge badge-active">
+              <Check size={9} /> Active
+            </span>
+          )}
         </div>
         <span className="muted">
           {fmtBytes(resume.size_bytes)} · Added {fmtDate(resume.created_at)}
         </span>
         {resume.parse_error_code && (
-          <span className="error-text">
-            Parser error: {resume.parse_error_code}
-          </span>
+          <span className="error-text">Parser error: {resume.parse_error_code}</span>
         )}
       </div>
-      <button className="secondary compact" onClick={onProfile}>
-        View profile
-      </button>
-      <button
-        className="icon-button danger-icon"
-        title="Delete resume"
-        onClick={onDelete}
-      >
-        <Trash2 size={17} />
-      </button>
+
+      <div className="resume-card-actions">
+        {!isActive && (
+          <button className="primary compact" onClick={onSetActive} title="Use this resume for matching">
+            <CheckCircle2 size={13} /> Set active
+          </button>
+        )}
+        <button className="secondary compact" onClick={onProfile}>
+          {isProfileOpen ? "Hide profile" : "View profile"}
+        </button>
+        <button className="icon-button danger-icon" title="Delete resume" onClick={onDelete}>
+          <Trash2 size={17} />
+        </button>
+      </div>
     </div>
   );
 }
