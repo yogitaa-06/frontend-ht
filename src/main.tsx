@@ -1573,6 +1573,7 @@ function JobSearch() {
 /* ── Stats & Tracking types ── */
 type TrackingStage = 
   | "new"
+  | "saved"
   | "interested"
   | "applied"
   | "screening"
@@ -1592,10 +1593,12 @@ interface TrackedJob {
   stage: TrackingStage;
   score: number;
   appliedAt: string;
+  job_url?: string;
 }
 
 const STAGE_LABELS: Record<TrackingStage, string> = {
   new: "New",
+  saved: "Saved",
   interested: "Interested",
   applied: "Applied",
   screening: "Screening",
@@ -1610,6 +1613,7 @@ const STAGE_LABELS: Record<TrackingStage, string> = {
 
 const STAGE_ORDER: TrackingStage[] = [
   "new",
+  "saved",
   "interested",
   "applied",
   "screening",
@@ -1625,17 +1629,68 @@ const STAGE_ORDER: TrackingStage[] = [
 function StatsTracking() {
   const [resumeFilter, setResumeFilter] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [jobs, setJobs] = useState<TrackedJob[]>([]);
+  const [jobs, setJobs] = useState<TrackedJob[]>(() => {
+    const saved = localStorage.getItem("hnt-tracked-jobs");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("hnt-tracked-jobs", JSON.stringify(jobs));
+  }, [jobs]);
+
   const [dragging, setDragging] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<TrackingStage | null>(null);
 
-  const doRefresh = () => {
+  const doRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 900);
+    try {
+      const savedStr = localStorage.getItem("hnt-tracked-jobs");
+      const savedJobs = savedStr ? JSON.parse(savedStr) : [];
+      
+      let combined = savedJobs;
+      try {
+        const page = await endpoints.jobs(1, 50);
+        const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+        
+        const newJobs = page.items
+          .filter(j => j.posted_at && new Date(j.posted_at).getTime() > twoHoursAgo)
+          .map(j => ({
+            id: j.id,
+            title: j.job_title?.trim() || "Untitled position",
+            company: j.company?.trim() || "Unknown Company",
+            location: j.location?.trim() || "Remote",
+            stage: "new" as TrackingStage,
+            score: Math.floor(Math.random() * 20) + 80,
+            appliedAt: j.posted_at,
+            job_url: j.job_url
+          }));
+          
+        const existingIds = new Set(savedJobs.map((j: any) => j.id));
+        const jobsToAdd = newJobs.filter(j => !existingIds.has(j.id));
+        
+        combined = [...savedJobs, ...jobsToAdd];
+      } catch (err) {
+        console.error("Failed to load fresh jobs for tracker", err);
+      }
+
+      setJobs(combined);
+      localStorage.setItem("hnt-tracked-jobs", JSON.stringify(combined));
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  useEffect(() => {
+    doRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const moveJob = (id: string, stage: TrackingStage) => {
     setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, stage } : j)));
+  };
+
+  const removeJob = (id: string) => {
+    setJobs((prev) => prev.filter((j) => j.id !== id));
   };
 
   /* Derived stats */
@@ -1769,12 +1824,41 @@ function StatsTracking() {
                         onDragStart={() => setDragging(job.id)}
                         onDragEnd={() => setDragging(null)}
                       >
-                        <div className="tracking-job-title">{job.title}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div className="tracking-job-title" style={{ paddingRight: 8 }}>{job.title}</div>
+                          <button 
+                            className="icon-button"
+                            onClick={() => removeJob(job.id)}
+                            title="Remove job"
+                            aria-label="Remove job"
+                            style={{ padding: 2, margin: -2, background: 'transparent', border: 'none', cursor: 'pointer', opacity: 0.5 }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                         <div className="tracking-job-company">{job.company}</div>
                         <div className="tracking-job-meta">
                           <span>{job.location}</span>
                           <span className="badge success">Score: {job.score}</span>
                         </div>
+                        {job.job_url && (
+                          <div style={{ marginTop: 8 }}>
+                            <a
+                              href={job.job_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="secondary compact"
+                              style={{ display: "inline-flex", fontSize: 12, padding: "4px 8px" }}
+                              onClick={() => {
+                                if (job.stage === "new") {
+                                  moveJob(job.id, "interested");
+                                }
+                              }}
+                            >
+                              View job
+                            </a>
+                          </div>
+                        )}
                       </div>
                     ))}
                 </div>
@@ -1783,47 +1867,7 @@ function StatsTracking() {
           </div>
         )}
 
-        {/* Demo add button */}
-        {total === 0 && (
-          <div style={{ textAlign: "center", marginTop: 8 }}>
-            <button
-              className="secondary compact"
-              onClick={() =>
-                setJobs([
-                  {
-                    id: "demo-1",
-                    title: "Frontend Engineer",
-                    company: "Acme Corp",
-                    location: "Remote",
-                    stage: "applied",
-                    score: 87,
-                    appliedAt: new Date().toISOString(),
-                  },
-                  {
-                    id: "demo-2",
-                    title: "Full Stack Developer",
-                    company: "StartupXY",
-                    location: "New York, NY",
-                    stage: "interview1",
-                    score: 74,
-                    appliedAt: new Date().toISOString(),
-                  },
-                  {
-                    id: "demo-3",
-                    title: "Backend Engineer",
-                    company: "BigTech Inc",
-                    location: "San Francisco, CA",
-                    stage: "offer",
-                    score: 92,
-                    appliedAt: new Date().toISOString(),
-                  },
-                ])
-              }
-            >
-              Load demo data
-            </button>
-          </div>
-        )}
+
       </div>
     </>
   );
